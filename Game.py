@@ -1,5 +1,7 @@
 import pygame as pg
 import random
+import os
+import sys
 pg.init()
 
 ##colors
@@ -21,31 +23,47 @@ level_count = 1
 bullet_rate = 20 ##how many clicks for 2 bullets to spawn
 bullet_speed = 20 ##how many clicks for bullet to get to player
 spawn_bullets = True
+game_over = False
+level_complete = False
+
+##path names
+current_path = os.path.dirname(sys.executable) ##sys.executable
+images_path = os.path.join(current_path, "images")
+sounds_path = os.path.join(current_path, "sounds")
+
+##resource path creator
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 ##window and display properties
 win_width = 500
 win_height = 600
 win = pg.display.set_mode((win_width, win_height))
-pg.display.set_caption("Space Lasers Game") 
-bg = pg.image.load("images/background.png")
+pg.display.set_caption("Galaxy Explorer")
+bg = pg.image.load(resource_path("images/background.png"))
 
 ##sounds and music
-laser_sound = pg.mixer.Sound("sounds/laser.wav")
-impact_sound = pg.mixer.Sound("sounds/impact.wav")
-hit_sound = pg.mixer.Sound("sounds/hit.wav")
-music = pg.mixer.music.load("sounds/music.mp3")
+laser_sound = pg.mixer.Sound(resource_path("sounds/laser.wav"))
+impact_sound = pg.mixer.Sound(resource_path("sounds/impact.wav"))
+hit_sound = pg.mixer.Sound(resource_path("sounds/hit.wav"))
+music = pg.mixer.music.load(resource_path("sounds/music.wav"))
 pg.mixer.music.play(-1)
+pg.mixer.music.set_volume(0.1)
 
 ##redraws the background image
 def redraw_background():
-    win.blit(bg, (0,0))
+    win.blit(bg, (0,0))   
     
 ##class which represents the player character
 class Player(pg.sprite.Sprite):
     def __init__(self):
         pg.sprite.Sprite.__init__(self)
 
-        self.image = pg.image.load("images/ship.png")
+        self.image = pg.image.load(resource_path("images/ship.png"))
         self.rect = self.image.get_rect()
 
         self.rect.x = int(win_width * 0.5) - int(self.rect.width * 0.5)
@@ -57,8 +75,7 @@ class Bullet(pg.sprite.Sprite):
     def __init__(self):
         pg.sprite.Sprite.__init__(self)
         
-        self.image = pg.Surface([5,10])
-        self.image.fill(hunter)
+        self.image = pg.image.load(resource_path("images/bullet.png"))
         self.rect = self.image.get_rect()  
         self.vel = 25
         laser_sound.play()
@@ -72,8 +89,7 @@ class EnemyBullet(pg.sprite.Sprite):
         global bullet_vel
         pg.sprite.Sprite.__init__(self)
 
-        self.image = pg.Surface([5,20])
-        self.image.fill(magenta)
+        self.image = pg.image.load(resource_path("images/bullet_enemy.png"))
         self.rect = self.image.get_rect()  
         self.vel = int(win_height / bullet_speed)
         
@@ -82,39 +98,14 @@ class EnemyBullet(pg.sprite.Sprite):
 
 ##class which represents enemies
 class Enemy(pg.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, num):
         pg.sprite.Sprite.__init__(self)
-
-        rand_int = random.randint(1,16)
-        self.image = pg.image.load("images/asteroid" + str(rand_int) + ".png")
+       
+        ran = random.randint(1,4)
+        self.image = pg.image.load(resource_path("images/asteroid") + str(num) + "." + str(ran) + ".png")
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
-
-##enemy which drops extra points on death
-class EnemyExtraPoints(Enemy):
-    def __init__(self, x, y):
-        pg.sprite.Sprite.__init__(self)
-    
-        self.image = pg.Surface([30,30])
-        self.image.fill(white)
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-
-##extra points capsule
-class Extra_points(pg.sprite.Sprite):
-    def __init__self(x, y):
-        pg.sprite.Sprite.__init__(self)
-        self.image = pg.Surface([10,10])
-        self.image.fill(white)
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-
-        self.vel = 10
-    def update():
-        self.rect.y += self.vel
         
 ##class represents the health bar of the player
 class HealthBar(pg.sprite.Sprite):
@@ -154,6 +145,25 @@ class HealthBar(pg.sprite.Sprite):
         self.rect.x = 5
         self.rect.y = 5
 
+##create enemy sprites
+def spawn_enemies():
+    spawn_x = 50
+    spawn_y = 50
+
+    ##pick two asteroid types to spawn
+    asteroid_numbers = random.sample(range(1,7),2)
+
+    while(spawn_x < win_width - 50):
+        while(spawn_y < win_height - 300):
+            ran = random.choice(asteroid_numbers)
+            enemy = Enemy(spawn_x, spawn_y, ran)
+            sprite_list.add(enemy)
+            enemy_list.add(enemy)
+
+            spawn_y += 50
+        spawn_y = 50
+        spawn_x += 50
+
 ##sets the scoreboard text
 def set_score(score):
     smallfont = pg.font.Font(None, 25)
@@ -187,65 +197,104 @@ def message_display(text, size):
 
 ##pause functionality
 def pause():
-    paused = True
-    while(paused):
+    global game_over
+    if(not game_over):
+        paused = True
+        while(paused):
+            pg.time.delay(80)
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    pg.quit()
+                if event.type == pg.KEYDOWN:
+                    if event.key == pg.K_ESCAPE:
+                        paused = False
+            redraw_background()
+            sprite_list.draw(win)
+            message_display("Paused", 72)
+
+            font = pg.font.Font(None, 38)
+            TextSurf, TextRect = text_objects("Esc to continue", font)
+            TextRect.center = (int(win_width / 2), int(3 * win_height / 5))
+            win.blit(TextSurf, TextRect)    
+            pg.display.update()
+    else:
+        main_menu()
+                
+##intro menu
+def main_menu():
+    intro_run = True
+    count = 0
+    while(intro_run):
         pg.time.delay(80)
+
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 pg.quit()
             if event.type == pg.KEYDOWN:
-                if event.key == pg.K_ESCAPE:
-                    paused = False
-        redraw_background
-        sprite_list.draw(win)
-        message_display("Paused - Escape to continue.", 36)
+                if event.key == pg.K_SPACE:
+                    intro_run = False
+
+        redraw_background()
+
+        font = pg.font.Font(None, 80)
+        TextSurf, TextRect = text_objects("Galaxy Explorer", font)
+        TextRect.center = (int(win_width / 2), int(win_height / 3))
+        win.blit(TextSurf, TextRect)    
+
+        if(count == 20):
+            font = pg.font.Font(None, 36)
+            TextSurf, TextRect = text_objects("Press Space to Begin", font)
+            TextRect.center = (int(win_width / 2), int(win_height / 2))
+            win.blit(TextSurf, TextRect)
+        elif(count < 20):
+            count += 1
+        
         pg.display.update()
-                
+    initialize_game()
+    countdown(3)
+    main_loop()
 
-##sprite list
-player_list = pg.sprite.Group()
-sprite_list = pg.sprite.Group()
-bullet_list = pg.sprite.Group()
-enemy_list = pg.sprite.Group()
-enemy_bullet_list = pg.sprite.Group()
-special_enemy_list = pg.sprite.Group()
+##creates all game assets needed to run the main loop
+def initialize_game():
 
-##create health bar
-health_bar = HealthBar()
-sprite_list.add(health_bar)
+    global player_list, sprite_list, bullet_list, enemy_list, enemy_bullet_list
+    global health_bar, player
+    global level_count, score, lives
+    global game_over, level_complete
+    global spawn_bullets, bullet_rate, bullet_speed
 
-##create player sprite
-player = Player()
-player_list.add(player)
-sprite_list.add(player)
+    level_count, score, lives = 1, 0, 5
+    game_over, level_complete = False, False
+    spawn_bullets, bullet_rate, bullet_speed = True, 20, 20
 
-##create enemy sprites
-def spawn_enemies():
-    spawn_x = 50
-    spawn_y = 50
+    ##sprite list
+    player_list = pg.sprite.Group()
+    sprite_list = pg.sprite.Group()
+    bullet_list = pg.sprite.Group()
+    enemy_list = pg.sprite.Group()
+    enemy_bullet_list = pg.sprite.Group()
 
-    while(spawn_x < win_width - 50):
-        while(spawn_y < win_height - 300):
-            enemy = Enemy(spawn_x, spawn_y)
-            sprite_list.add(enemy)
-            enemy_list.add(enemy)
+    ##create health bar
+    health_bar = HealthBar()
+    sprite_list.add(health_bar)
 
-            spawn_y += 50
-        spawn_y = 50
-        spawn_x += 50
+    ##create player sprite
+    player = Player()
+    player_list.add(player)
+    sprite_list.add(player)
 
-spawn_enemies()
+    spawn_enemies()
 
-##draw initial sprites
-redraw_background()
-sprite_list.draw(win)
-pg.display.update()
+    ##draw initial sprites
+    redraw_background()
+    sprite_list.draw(win)
+    pg.display.update()
 
 ##countdown to game start
 def countdown(num):
     count_from = num
     current_count = num
-
+    
     message_display("Level " + str(level_count), 72)
     pg.display.update()
     pg.time.delay(1000)
@@ -260,161 +309,178 @@ def countdown(num):
         redraw_background()
         sprite_list.draw(win)
         current_count -= 1
-        
-countdown(3)
 
 ##main game loop
-run = True
-level_complete = False
-game_over = False
-count = 0   
-first_x = player.rect.x
-while run:
-    pg.time.delay(80)
+def main_loop():
+    #global variables
+    global spawn_bullets, bullet_rate, bullet_speed
+    global score, lives, level_count
+    global game_over, level_complete
     
-    ##check if level is completed
-    if(level_complete and len(bullet_list) == 0 and len(enemy_bullet_list) == 0):
-        spawn_enemies()
-        pg.display.update()
-        spawn_bullets = True
-        level_complete = False
-
-        ##increase difficulty of next level
-        level_count += 1
-        bullet_rate = int(bullet_rate * 0.9)
-        bullet_speed = int(bullet_speed * 0.95)
-        player_list.add(player)
-        countdown(3)
+    ##main game loop
+    run = True
+    count = 0   
+    first_x = player.rect.x
+    while run:
+        pg.time.delay(80)
         
-    ##count 10k ticks and then reset
-    if count > 10000:
-        count = 0
-    else:
-        count += 1
+        ##check if level is completed
+        if(level_complete and len(bullet_list) == 0 and len(enemy_bullet_list) == 0):
+            spawn_enemies()
+            pg.display.update()
+            spawn_bullets = True
+            level_complete = False
 
-    ##event detections
-    for event in pg.event.get():
-        if event.type == pg.QUIT:
-            pg.quit()
-        elif(event.type == pg.KEYDOWN):
-            if(event.key == pg.K_ESCAPE):
-                pause() 
-            elif(event.key == pg.K_SPACE):
-                if(spawn_bullets):
-                    bullet = Bullet()
-                    bullet.rect.x = player.rect.x + int(float(player.rect.width) / 2)
-                    bullet.rect.y = player.rect.y
-                       
-                    sprite_list.add(bullet)
-                    bullet_list.add(bullet)
+            ##increase difficulty of next level
+            level_count += 1
+            bullet_rate = int(bullet_rate * 0.9)
+            bullet_speed = int(bullet_speed * 0.95)
+            player_list.add(player)
+            countdown(3)
+            
+        ##count 10k ticks and then reset
+        if count > 10000:
+            count = 0
+        else:
+            count += 1
 
-    ##keypress detections
-    keys = pg.key.get_pressed()
-    
-    if keys[pg.K_LEFT]:
-        if(player.rect.x > 0):
-            player.rect.x -= player.vel
-    if keys[pg.K_RIGHT]:
-        if(player.rect.x < win_width - player.rect.width):
-            player.rect.x += player.vel
+        ##event detections
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+            elif(event.type == pg.KEYDOWN):
+                if(event.key == pg.K_ESCAPE):
+                    pause() 
+                elif(event.key == pg.K_SPACE):
+                    if(spawn_bullets):
+                        bullet = Bullet()
+                        bullet.rect.x = player.rect.x + int(float(player.rect.width) / 2)
+                        bullet.rect.y = player.rect.y
+                           
+                        sprite_list.add(bullet)
+                        bullet_list.add(bullet)
 
-    ##spawn enemy bullets
-    if spawn_bullets:
-        ##spawn enemy bullets ahead of the player
-        if count % bullet_rate == 0:
-            eb = EnemyBullet()
-            eb.rect.y = 0
+        ##keypress detections
+        keys = pg.key.get_pressed()
+        
+        if keys[pg.K_LEFT]:
+            if(player.rect.x > 0):
+                player.rect.x -= player.vel
+        if keys[pg.K_RIGHT]:
+            if(player.rect.x < win_width - player.rect.width):
+                player.rect.x += player.vel
 
-            ##if player is moving left, right, or neither
-            if keys[pg.K_LEFT]:
-                x_left = (float(player.vel)/float(eb.vel)) * (player.rect.y - eb.rect.y)
-                eb.rect.x = int(player.rect.x - x_left) + int(player.rect.width /2)
-                if(eb.rect.x < 0):
-                    eb.rect.x = 10
-            elif keys[pg.K_RIGHT]:
-                x_right = (float(player.vel)/float(eb.vel)) * (player.rect.y - eb.rect.y)
-                eb.rect.x = int(player.rect.x + x_right) + int(player.rect.width /2)
+        ##spawn enemy bullets
+        if spawn_bullets:
+            ##spawn enemy bullets ahead of the player
+            if count % bullet_rate == 0:
+                eb = EnemyBullet()
+                eb.rect.y = 0
+
+                ##if player is moving left, right, or neither
+                if keys[pg.K_LEFT]:
+                    x_left = (float(player.vel)/float(eb.vel)) * (player.rect.y - eb.rect.y)
+                    eb.rect.x = int(player.rect.x - x_left) + int(player.rect.width /2)
+                    if(eb.rect.x < 0):
+                        eb.rect.x = 10
+                elif keys[pg.K_RIGHT]:
+                    x_right = (float(player.vel)/float(eb.vel)) * (player.rect.y - eb.rect.y)
+                    eb.rect.x = int(player.rect.x + x_right) + int(player.rect.width /2)
+                    if(eb.rect.x > win_width):
+                        eb.rect.x = win_width - 10
+                else:
+                    eb.rect.x = player.rect.x + int(player.rect.width /2)
+                           
+                ##add bullet to game
+                enemy_bullet_list.add(eb)
+                sprite_list.add(eb)               
+
+            ##spawn enemy bullets based on the player's average movement
+            if count % bullet_rate == int(bullet_rate / 2):
+                eb = EnemyBullet()
+                eb.rect.y = 0
+                
+                ##find how far the player has moved since last iteration
+                second_x = player.rect.x
+                diff_x = second_x - first_x
+
+                ##calculate average velocity and expected pos 10 clicks from now
+                avg_vel = float(diff_x) / 10
+                x_side = (avg_vel / float(eb.vel)) * (player.rect.y - eb.rect.y)
+                eb.rect.x = player.rect.x + int(x_side) + int(player.rect.width /2)
+
                 if(eb.rect.x > win_width):
                     eb.rect.x = win_width - 10
-            else:
-                eb.rect.x = player.rect.x + int(player.rect.width /2)
-                       
-            ##add bullet to game
-            enemy_bullet_list.add(eb)
-            sprite_list.add(eb)               
+                if(eb.rect.x < 0):
+                    eb.rect.x = 10
 
-        ##spawn enemy bullets based on the player's average movement
-        if count % bullet_rate == int(bullet_rate / 2):
-            eb = EnemyBullet()
-            eb.rect.y = 0
+                ##set first_x for the next iteration
+                first_x = second_x
+               
+                ##add bullet to game
+                enemy_bullet_list.add(eb)
+                sprite_list.add(eb)
             
-            ##find how far the player has moved since last iteration
-            second_x = player.rect.x
-            diff_x = second_x - first_x
+        ##update sprites
+        sprite_list.update()
 
-            ##calculate average velocity and expected pos 10 clicks from now
-            avg_vel = float(diff_x) / 10
-            x_side = (avg_vel / float(eb.vel)) * (player.rect.y - eb.rect.y)
-            eb.rect.x = player.rect.x + int(x_side) + int(player.rect.width /2)
+        ##bullet mechanics 
+        for bullet in bullet_list:
+            if(bullet.rect.y < bullet.rect.height):
+                bullet.vel *= -1
+                bullet.image = pg.image.load(resource_path("images/bullet_red.png"))
+            elif(bullet.rect.y > win_height + bullet.rect.height):
+                bullet_list.remove(bullet)
+                sprite_list.remove(bullet)
+            elif(pg.sprite.spritecollide(bullet, player_list, False)):
+                bullet_list.remove(bullet)
+                sprite_list.remove(bullet)
+                hit_by_bullet()
+            elif(pg.sprite.spritecollide(bullet, enemy_list, True)):
+                sprite_list.remove(bullet)
+                bullet_list.remove(bullet)
+                hit_sound.play()
+                score += 10
+                if(len(enemy_list) == 0):
+                    player_list.remove(player)
+                    level_complete = True
+                    spawn_bullets = False
 
-            if(eb.rect.x > win_width):
-                eb.rect.x = win_width - 10
-            if(eb.rect.x < 0):
-                eb.rect.x = 10
-
-            ##set first_x for the next iteration
-            first_x = second_x
-           
-            ##add bullet to game
-            enemy_bullet_list.add(eb)
-            sprite_list.add(eb)
+        ##enemy bullet mechanics
+        for bullet in enemy_bullet_list:
+            if(bullet.rect.y > win_height + bullet.rect.height):
+                enemy_bullet_list.remove(bullet)
+                sprite_list.remove(bullet)
+            elif(pg.sprite.spritecollide(bullet, player_list, False)):
+                enemy_bullet_list.remove(bullet)
+                sprite_list.remove(bullet)
+                hit_by_bullet()
         
-    ##update sprites
-    sprite_list.update()
+        ##refresh window and sprite
+        redraw_background()
+        sprite_list.draw(win)
+        if not game_over:
+            set_score(score)
 
-    ##bullet mechanics 
-    for bullet in bullet_list:
-        if(bullet.rect.y < bullet.rect.height):
-            bullet.vel *= -1
-            bullet.image.fill(red)
-        elif(bullet.rect.y > win_height + bullet.rect.height):
-            bullet_list.remove(bullet)
-            sprite_list.remove(bullet)
-        elif(pg.sprite.spritecollide(bullet, player_list, False)):
-            bullet_list.remove(bullet)
-            sprite_list.remove(bullet)
-            hit_by_bullet()
-        elif(pg.sprite.spritecollide(bullet, enemy_list, True)):
-            sprite_list.remove(bullet)
-            bullet_list.remove(bullet)
-            hit_sound.play()
-            score += 10
-            if(len(enemy_list) == 0):
-                player_list.remove(player)
-                level_complete = True
-                spawn_bullets = False
+        ##check if game is over
+        if(game_over):
+            message_display("Game Over", 96)
 
-    ##enemy bullet mechanics
-    for bullet in enemy_bullet_list:
-        if(bullet.rect.y > win_height + bullet.rect.height):
-            enemy_bullet_list.remove(bullet)
-            sprite_list.remove(bullet)
-        elif(pg.sprite.spritecollide(bullet, player_list, False)):
-            enemy_bullet_list.remove(bullet)
-            sprite_list.remove(bullet)
-            hit_by_bullet()
-    
-    ##refresh window and sprite
-    redraw_background()
-    sprite_list.draw(win)
-    set_score(score)
+            font = pg.font.Font(None, 38)
+            TextSurf, TextRect = text_objects("Score: " + str(score), font)
+            TextRect.center = (int(win_width / 2), int(6 * win_height / 10))
+            win.blit(TextSurf, TextRect)
 
-    ##check if game is over
-    if(game_over):
-        message_display("Game Over", 96)
-        spawn_bullets = False
-        player_list.remove(player)
-    
-    pg.display.update()
-    
-pg.quit()
+            font = pg.font.Font(None, 30)
+            TextSurf, TextRect = text_objects("Esc to main menu", font)
+            TextRect.center = (int(win_width / 2), int(7 * win_height / 10))
+            win.blit(TextSurf, TextRect) 
+            
+            spawn_bullets = False
+            player_list.remove(player)
+        
+        pg.display.update()
+
+##main execution runs in the following order:
+##main_menu -> initialize_game -> countdown -> main_loop
+main_menu()
