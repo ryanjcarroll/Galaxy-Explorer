@@ -42,6 +42,7 @@ def resource_path(relative_path):
 ##window and display properties
 win_width = 500
 win_height = 600
+mspf = 80 ##milliseconds per frame
 win = pg.display.set_mode((win_width, win_height))
 pg.display.set_caption("Galaxy Explorer")
 bg = pg.image.load(resource_path("images/background.png"))
@@ -169,6 +170,13 @@ def set_score(score):
     smallfont = pg.font.Font(None, 25)
     text = smallfont.render("Score: "  + str(score), True, white)
     win.blit(text, [5,win_height - 30])
+
+##sets the level text
+def set_level(level):
+    smallfont = pg.font.Font(None, 25)
+    text = smallfont.render("Level: "  + str(level), True, white)
+    width = text.get_rect().width
+    win.blit(text, [win_width - 5 - width,win_height - 30])
     
 ##method runs when the player is hit by a bullet
 def hit_by_bullet():
@@ -292,23 +300,49 @@ def initialize_game():
 
 ##countdown to game start
 def countdown(num):
+
+    clock = pg.time.Clock()
+    
+    run_countdown = True
     count_from = num
     current_count = num
+    time_elapsed = 0
     
-    message_display("Level " + str(level_count), 72)
-    pg.display.update()
-    pg.time.delay(1000)
-    redraw_background()
-    sprite_list.draw(win)
-    pg.display.update()
-        
-    for i in range(count_from, 0, -1):
-        message_display(str(current_count), 72)
-        pg.display.update()
-        pg.time.delay(1000)
-        redraw_background()
-        sprite_list.draw(win)
-        current_count -= 1
+    while(run_countdown):
+        pg.time.delay(mspf)
+        dt = clock.tick()
+        time_elapsed += dt
+
+        if(time_elapsed < 1000):
+            redraw_background()
+            set_score(score)
+            set_level(level_count)
+            sprite_list.draw(win)
+            message_display("Level " + str(level_count), 72)
+            pg.display.update()
+        elif(time_elapsed < 2000):
+            redraw_background()
+            set_score(score)
+            set_level(level_count)
+            sprite_list.draw(win)
+            message_display("3", 72)
+            pg.display.update()
+        elif(time_elapsed < 3000):
+            redraw_background()
+            set_score(score)
+            set_level(level_count)
+            sprite_list.draw(win)
+            message_display("2", 72)
+            pg.display.update()
+        elif(time_elapsed < 4000):
+            redraw_background()
+            set_score(score)
+            set_level(level_count)
+            sprite_list.draw(win)
+            message_display("1", 72)
+            pg.display.update()
+        else:
+            run_countdown = False  
 
 ##main game loop
 def main_loop():
@@ -316,13 +350,14 @@ def main_loop():
     global spawn_bullets, bullet_rate, bullet_speed
     global score, lives, level_count
     global game_over, level_complete
+    global mspf
     
     ##main game loop
     run = True
     count = 0   
     first_x = player.rect.x
     while run:
-        pg.time.delay(80)
+        pg.time.delay(mspf)
         
         ##check if level is completed
         if(level_complete and len(bullet_list) == 0 and len(enemy_bullet_list) == 0):
@@ -359,6 +394,11 @@ def main_loop():
                            
                         sprite_list.add(bullet)
                         bullet_list.add(bullet)
+                elif(event.key == pg.K_r):
+                    if(game_over):
+                        initialize_game()
+                        countdown(3)
+                        main_loop()
 
         ##keypress detections
         keys = pg.key.get_pressed()
@@ -456,9 +496,10 @@ def main_loop():
                 sprite_list.remove(bullet)
                 hit_by_bullet()
         
-        ##refresh window and sprite
+        ##refresh window, text, and sprites
         redraw_background()
         sprite_list.draw(win)
+        set_level(level_count)
         if not game_over:
             set_score(score)
 
@@ -474,8 +515,13 @@ def main_loop():
             font = pg.font.Font(None, 30)
             TextSurf, TextRect = text_objects("Esc to main menu", font)
             TextRect.center = (int(win_width / 2), int(7 * win_height / 10))
-            win.blit(TextSurf, TextRect) 
-            
+            win.blit(TextSurf, TextRect)
+
+            font = pg.font.Font(None, 30)
+            TextSurf, TextRect = text_objects("R to restart", font)
+            TextRect.center = (int(win_width / 2), int(15 * win_height / 20))
+            win.blit(TextSurf, TextRect)
+
             spawn_bullets = False
             player_list.remove(player)
         
