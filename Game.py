@@ -20,8 +20,8 @@ red_orange = (255,83,73)
 score = 0
 lives = 5
 level_count = 1
-bullet_rate = 20 ##how many clicks for 2 bullets to spawn
-bullet_speed = 20 ##how many clicks for bullet to get to player
+bullet_rate = 60 ##how many clicks for 2 bullets to spawn
+bullet_speed = 40 ##how many clicks for bullet to get to player
 spawn_bullets = True
 game_over = False
 level_complete = False
@@ -42,7 +42,7 @@ def resource_path(relative_path):
 ##window and display properties
 win_width = 500
 win_height = 600
-mspf = 80 ##milliseconds per frame
+mspf = 40 ##milliseconds per frame
 win = pg.display.set_mode((win_width, win_height))
 pg.display.set_caption("Galaxy Explorer")
 bg = pg.image.load(resource_path("images/background.png"))
@@ -271,9 +271,9 @@ def initialize_game():
     global game_over, level_complete
     global spawn_bullets, bullet_rate, bullet_speed
 
-    level_count, score, lives = 1, 0, 5
-    game_over, level_complete = False, False
-    spawn_bullets, bullet_rate, bullet_speed = True, 20, 20
+    level_count, score, lives = level_count, score, lives
+    game_over, level_complete = game_over, level_complete
+    spawn_bullets, bullet_rate, bullet_speed = spawn_bullets, bullet_rate, bullet_speed
 
     ##sprite list
     player_list = pg.sprite.Group()
